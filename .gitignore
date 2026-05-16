@@ -1,0 +1,9 @@
+# 備份檔案 (含資料庫密碼等敏感資訊)
+17-backup-restore/backup_files/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+*.swp
