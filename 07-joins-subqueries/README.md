@@ -4,6 +4,8 @@
 
 ## 7.1 JOIN 類型
 
+![INNER JOIN 多表查詢範例](./screenshots/01-inner-join.png)
+
 ```
 A ── INNER JOIN ── B     :兩邊都有對應的列
 A ── LEFT  JOIN ── B     :左邊全留,右邊沒對應補 NULL
@@ -32,6 +34,8 @@ FULL JOIN shop.books b ON b.author_id = a.id;
 ```
 
 ## 7.2 多表 JOIN
+
+![LEFT JOIN 含聚合範例](./screenshots/02-left-join-aggregate.png)
 
 ```sql
 -- 訂單 + 客戶 + 訂單明細 + 書

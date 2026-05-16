@@ -6,6 +6,8 @@
 
 View 是「**儲存起來的 SELECT 查詢**」,用起來像表,但**每次查詢都會即時執行底層 SQL**。
 
+![建立 VIEW 範例](./screenshots/02-create-view.png)
+
 ```sql
 CREATE VIEW shop.v_book_full AS
 SELECT

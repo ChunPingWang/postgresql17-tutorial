@@ -54,6 +54,8 @@ SET title = EXCLUDED.title,
 
 ## 6.2 SELECT
 
+![SELECT 查詢範例](./screenshots/01-select-all-books.png)
+
 ```sql
 -- 基本
 SELECT id, title, price FROM shop.books;
@@ -79,6 +81,8 @@ ORDER BY country, name;
 ```
 
 ### WHERE 條件
+
+![WHERE 過濾條件範例](./screenshots/02-where-clause.png)
 
 ```sql
 SELECT * FROM shop.books WHERE price > 500;
@@ -120,6 +124,8 @@ OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY;
 > ⚠️ `OFFSET` 數字大時效能差。海量分頁請改 keyset 分頁 (見第 18 章)。
 
 ## 6.3 UPDATE
+
+![UPDATE 更新資料範例](./screenshots/04-update.png)
 
 ```sql
 -- 基本

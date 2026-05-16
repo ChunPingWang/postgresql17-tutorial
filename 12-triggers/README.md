@@ -4,6 +4,8 @@
 
 ## 12.1 Trigger 的組成
 
+![建立 TRIGGER 範例](./screenshots/02-create-trigger.png)
+
 一個 trigger 由兩部分組成:
 1. **Trigger function**:`RETURNS TRIGGER`,描述要做什麼
 2. **Trigger 本身**:綁定到表 + 事件 + 條件

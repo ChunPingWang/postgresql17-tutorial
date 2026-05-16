@@ -17,6 +17,8 @@
 
 ## 15.2 JSONB 操作子
 
+![JSONB 欄位查詢範例](./screenshots/01-jsonb-query.png)
+
 | 操作子 | 說明 | 範例 |
 |--------|------|------|
 | `->` | 取 JSON 子元素 (回 JSONB) | `data->'name'` |

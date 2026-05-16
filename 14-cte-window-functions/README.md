@@ -6,6 +6,8 @@
 
 CTE 用 `WITH` 子句定義「臨時命名查詢」,讓複雜 SQL 更易讀。
 
+![CTE + 累計視窗函數範例](./screenshots/01-cte-running-total.png)
+
 ```sql
 WITH
     category_stats AS (
@@ -111,6 +113,8 @@ function_name() OVER (
 ```
 
 ## 14.4 排名函數
+
+![PARTITION BY 分組視窗函數](./screenshots/02-partition-by.png)
 
 ```sql
 SELECT

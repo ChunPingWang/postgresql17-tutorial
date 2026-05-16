@@ -24,6 +24,10 @@
 
 ## 9.3 建立 / 刪除索引
 
+![查看現有索引](./screenshots/01-list-indexes.png)
+
+![索引使用統計](./screenshots/02-index-stats.png)
+
 ```sql
 -- 基本
 CREATE INDEX idx_books_price ON shop.books(price);

@@ -10,6 +10,8 @@
 
 ## 18.2 EXPLAIN 進階閱讀
 
+![EXPLAIN 查詢計畫範例](./screenshots/01-explain.png)
+
 ```sql
 EXPLAIN (
     ANALYZE,     -- 實際執行並量測時間
@@ -94,6 +96,10 @@ ALTER TABLE shop.order_items SET (autovacuum_vacuum_scale_factor = 0.01);
 ```
 
 ## 18.5 postgresql.conf 效能參數
+
+![資料表大小統計](./screenshots/02-table-sizes.png)
+
+![PostgreSQL 效能參數](./screenshots/03-perf-settings.png)
 
 ```ini
 # 記憶體

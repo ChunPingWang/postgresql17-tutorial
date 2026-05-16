@@ -20,6 +20,8 @@ PostgreSQL **11+** 才有真正的 `PROCEDURE`,在那之前只有 `FUNCTION` 也
 
 ## 11.2 簡單 Function (SQL 語言)
 
+![建立函數範例](./screenshots/01-create-function.png)
+
 ```sql
 CREATE OR REPLACE FUNCTION shop.add(a INT, b INT)
 RETURNS INT

@@ -19,6 +19,8 @@
 
 ## 8.2 GROUP BY
 
+![GROUP BY + HAVING 範例](./screenshots/01-group-by-having.png)
+
 ```sql
 SELECT category_id, COUNT(*) AS book_count, AVG(price)::NUMERIC(10,2) AS avg_price
 FROM shop.books
@@ -151,6 +153,8 @@ SELECT COUNT(*), COUNT(x), SUM(x), AVG(x) FROM t;
 ```
 
 ## 8.9 實戰:銷售報表
+
+![視窗函數 RANK() 範例](./screenshots/02-window-function.png)
 
 ```sql
 SELECT
