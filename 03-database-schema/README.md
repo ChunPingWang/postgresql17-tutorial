@@ -150,6 +150,22 @@ ALTER DATABASE bookstore SET search_path TO shop, public;
 
 這在多使用者隔離時很方便。
 
+### search_path 影響哪些功能?
+
+search_path 是 PostgreSQL 所有「**不帶 schema 前綴名稱**」的統一解析規則,範圍比多數人以為的廣:
+
+| 功能 | 說明 |
+|------|------|
+| **資料表 / view / sequence 查詢** | `SELECT`、`INSERT`、`UPDATE`、`DELETE` 中的短名解析 |
+| **建立新物件** | `CREATE TABLE` 等未指定 schema 時,建在第一個實際存在的 schema |
+| **函數呼叫** | `SELECT my_func(1)` 依 search_path 找函數;內建函數能直接用是因為隱含的 `pg_catalog` 排最前 |
+| **運算子** | 連 `=`、`+`、`\|\|` 都是依 search_path 解析的物件,可被自訂 schema 的同名運算子遮蔽 |
+| **資料型別** | `CREATE TABLE t (col my_enum)` 的型別名、`'abc'::my_type` 的轉型 |
+| **DROP / ALTER 等 DDL** | `DROP TABLE products` 刪的是 search_path 找到的**第一個** `products`——多 schema 同名表時有刪錯的風險 |
+| **名稱顯示** | 反向也適用:`::regclass`、`\d`、錯誤訊息中,物件可見時顯示短名 (`books`),不可見才顯示全名 (`shop.books`) |
+
+一句話總結:讀、寫、建、刪、函數、運算子、型別全部適用——`CREATE TABLE` 的落點只是其中「建」的那個面向。
+
 ### 隱含的 schema:`pg_temp` 與 `pg_catalog`
 
 `SHOW search_path` 顯示的不是全貌。實際生效的搜尋順序前面還隱含了兩個 schema:
