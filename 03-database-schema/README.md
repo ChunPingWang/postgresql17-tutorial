@@ -156,6 +156,8 @@ LEFT JOIN pg_roles    r ON r.oid = s.setrole;
 -- setconfig 會顯示如 {search_path=shop, public}
 ```
 
+**查詢中 `COALESCE` 的作用**:`COALESCE(a, b)` 回傳第一個非 NULL 的參數(詳見[第 6 章 6.6 節](../06-crud-basic-sql/))。`pg_db_role_setting` 用 `0` 表示「不限定」——例如 `ALTER ROLE ... SET` 不限資料庫,其 `setdatabase = 0`,LEFT JOIN 配不到任何 `pg_database` 列而補 NULL。COALESCE 把這些 NULL 換成 `(所有資料庫)` / `(所有角色)` 標籤,讓「配不到」和「適用於全部」在結果中可以區分。
+
 > 💡 **查詢結果為空是正常的**:這張表只存 `ALTER DATABASE/ROLE ... SET` 寫入的持久設定,沒設定過就是空的。想看到資料,先執行 `ALTER DATABASE bookstore SET search_path TO shop, public;` 再查一次(看完記得 `RESET` 還原)。可與下方 `pg_settings` 查詢交叉驗證:表為空時 `source` 應顯示 `default` 或 `session`,而不會是 `database` / `user`。另外,示範腳本 `03-search-path-query.sql` 結尾會 RESET 清理,跑完後此表同樣是空的——刻意設計,不留副作用。
 
 psql 裡一行看完:`\drds`
