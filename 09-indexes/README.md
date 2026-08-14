@@ -1,6 +1,8 @@
 # 第 9 章 索引 (Index)
 
 > 目標:理解 PostgreSQL 各種索引型別、何時建索引、如何用 EXPLAIN 驗證索引是否被使用。
+>
+> 🧰 **前置準備**:本章範例使用 `bookstore` 資料庫 (`shop` schema 與範例資料)。尚未建立的話,先在 repo 根目錄執行 `psql -d postgres -f setup/01-create-tutorial-db.sql` 與 `psql -d bookstore -f setup/02-sample-data.sql`,詳見[第 1 章 1.8 節](../01-installation/README.md#18-建立教學用資料庫)。
 
 ## 9.1 為什麼需要索引
 

@@ -1,6 +1,8 @@
 # 第 4 章 資料型別
 
 > 目標:認識 PostgreSQL 各類資料型別,知道每種型別的選用時機與陷阱。
+>
+> 🧰 **前置準備**:本章範例使用 `bookstore` 資料庫 (`shop` schema 與範例資料)。尚未建立的話,先在 repo 根目錄執行 `psql -d postgres -f setup/01-create-tutorial-db.sql` 與 `psql -d bookstore -f setup/02-sample-data.sql`,詳見[第 1 章 1.8 節](../01-installation/README.md#18-建立教學用資料庫)。
 
 PostgreSQL 內建型別之豐富是它的招牌之一,本章涵蓋日常會用到的 95%。
 

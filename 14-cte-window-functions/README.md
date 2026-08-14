@@ -1,6 +1,8 @@
 # 第 14 章 CTE 與視窗函數
 
 > 目標:能用 CTE 簡化多層查詢、用遞迴 CTE 走階層資料、用視窗函數做排名與累積統計。
+>
+> 🧰 **前置準備**:本章範例使用 `bookstore` 資料庫 (`shop` schema 與範例資料)。尚未建立的話,先在 repo 根目錄執行 `psql -d postgres -f setup/01-create-tutorial-db.sql` 與 `psql -d bookstore -f setup/02-sample-data.sql`,詳見[第 1 章 1.8 節](../01-installation/README.md#18-建立教學用資料庫)。
 
 ## 14.1 CTE (Common Table Expression)
 

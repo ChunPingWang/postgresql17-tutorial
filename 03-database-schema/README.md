@@ -1,6 +1,8 @@
 # 第 3 章 資料庫與 Schema 基礎
 
 > 目標:理解 PostgreSQL 的 cluster / database / schema / object 階層,並學會建立、切換、刪除這些物件。
+>
+> 🧰 **前置準備**:本章範例使用 `bookstore` 資料庫 (`shop` schema 與範例資料)。尚未建立的話,先在 repo 根目錄執行 `psql -d postgres -f setup/01-create-tutorial-db.sql` 與 `psql -d bookstore -f setup/02-sample-data.sql`,詳見[第 1 章 1.8 節](../01-installation/README.md#18-建立教學用資料庫)。
 
 ## 3.1 階層結構
 

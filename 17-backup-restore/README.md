@@ -1,6 +1,8 @@
 # 第 17 章 備份與還原
 
 > 目標:能用 `pg_dump` / `pg_restore` 執行完整備份與還原,了解不同備份格式的使用時機。
+>
+> 🧰 **前置準備**:本章範例使用 `bookstore` 資料庫 (`shop` schema 與範例資料)。尚未建立的話,先在 repo 根目錄執行 `psql -d postgres -f setup/01-create-tutorial-db.sql` 與 `psql -d bookstore -f setup/02-sample-data.sql`,詳見[第 1 章 1.8 節](../01-installation/README.md#18-建立教學用資料庫)。 本章的範例 dump 檔 `backup_files/bookstore.sql` 反映的是完成第 10–12 章 (view / 函數 / trigger) 後的資料庫;你自己的 dump 內容會依已完成的章節而異,備份指令本身不受影響。
 
 ## 17.1 備份工具概覽
 

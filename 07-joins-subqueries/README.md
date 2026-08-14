@@ -1,6 +1,8 @@
 # 第 7 章 JOIN 與子查詢
 
 > 目標:理解各種 JOIN 的差異與使用時機,學會用子查詢、CTE、LATERAL 解決複雜資料拼裝。
+>
+> 🧰 **前置準備**:本章範例使用 `bookstore` 資料庫 (`shop` schema 與範例資料)。尚未建立的話,先在 repo 根目錄執行 `psql -d postgres -f setup/01-create-tutorial-db.sql` 與 `psql -d bookstore -f setup/02-sample-data.sql`,詳見[第 1 章 1.8 節](../01-installation/README.md#18-建立教學用資料庫)。
 
 ## 7.1 JOIN 類型
 

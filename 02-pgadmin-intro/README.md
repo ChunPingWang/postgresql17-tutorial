@@ -1,6 +1,8 @@
 # 第 2 章 pgAdmin 4 介紹與基本操作
 
 > 目標:認識 pgAdmin 4 介面、建立伺服器連線、使用 Query Tool 執行 SQL。
+>
+> 🧰 **前置準備**:本章範例使用 `bookstore` 資料庫 (`shop` schema 與範例資料)。尚未建立的話,先在 repo 根目錄執行 `psql -d postgres -f setup/01-create-tutorial-db.sql` 與 `psql -d bookstore -f setup/02-sample-data.sql`,詳見[第 1 章 1.8 節](../01-installation/README.md#18-建立教學用資料庫)。
 
 ## 2.1 pgAdmin 是什麼
 

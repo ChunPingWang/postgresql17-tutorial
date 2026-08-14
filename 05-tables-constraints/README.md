@@ -1,6 +1,8 @@
 # 第 5 章 資料表設計與約束
 
 > 目標:能完整定義一張表的結構與約束,避免「先讓資料進去再說」的常見錯誤。
+>
+> 🧰 **前置準備**:本章範例使用 `bookstore` 資料庫 (`shop` schema 與範例資料)。尚未建立的話,先在 repo 根目錄執行 `psql -d postgres -f setup/01-create-tutorial-db.sql` 與 `psql -d bookstore -f setup/02-sample-data.sql`,詳見[第 1 章 1.8 節](../01-installation/README.md#18-建立教學用資料庫)。
 
 ## 5.1 CREATE TABLE 完整語法
 
