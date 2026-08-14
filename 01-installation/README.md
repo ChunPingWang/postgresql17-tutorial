@@ -137,6 +137,57 @@ psql -d bookstore -c "SELECT COUNT(*) FROM shop.books;"
 #      8
 ```
 
+### 用 psql 執行 .sql 檔案:完整用法
+
+上面用到的 `-f` 是本教程執行章節腳本的標準方式,這裡完整說明。
+
+**三種執行方式**:
+
+```bash
+# 1. -f:執行整個 .sql 檔 (最常用)
+psql -d bookstore -f scripts/01-verify-install.sql
+
+# 2. -c:執行單一指令 (適合快速查詢、shell 腳本)
+psql -d bookstore -c "SELECT COUNT(*) FROM shop.books;"
+
+# 3. \i:已在 psql 內時載入檔案
+psql -d bookstore
+bookstore=# \i scripts/01-verify-install.sql
+```
+
+`-f` 的路徑是相對於**執行指令的目錄** (cwd),不是檔案所在目錄,所以本教程的指令都假設你在 repo 根目錄執行。`\i` 同理;若 .sql 檔內要引用其他 .sql 檔,用 `\ir` (相對於該腳本自身的路徑)。
+
+**多個檔案依序執行** (PG 15+ 可重複 `-f`):
+
+```bash
+psql -d postgres   -f setup/01-create-tutorial-db.sql
+psql -d bookstore  -f setup/02-sample-data.sql
+
+# 或一次全部 (依檔名排序)
+for f in 03-database-schema/scripts/*.sql; do
+    psql -d bookstore -f "$f"
+done
+```
+
+**實用參數**:
+
+| 參數 | 用途 |
+|------|------|
+| `-v ON_ERROR_STOP=1` | **遇錯即停**並回傳非零 exit code。預設 psql 遇錯會繼續往下執行,自動化腳本務必加這個 |
+| `--single-transaction` | 整個檔案包成一個交易,全成功或全回滾。⚠️ 檔案內含 `CREATE DATABASE` 等不能進交易的指令時不可用 (見第 3 章 3.2) |
+| `-e` | 執行前回顯每條 SQL,對照輸出時好用 |
+| `-q` | 安靜模式,只輸出查詢結果 |
+| `-o result.txt` | 結果寫入檔案 |
+| `-h` / `-p` / `-U` | 主機 / 埠 / 使用者,連遠端時用:`psql -h db.example.com -p 5432 -U app -d bookstore -f x.sql` |
+
+```bash
+# 自動化 / CI 的推薦組合
+psql -d bookstore -v ON_ERROR_STOP=1 -f migrate.sql
+echo $?   # 0 = 成功,非 0 = 有錯誤
+```
+
+**密碼**:遠端連線避免把密碼寫在指令裡,用環境變數 `PGPASSWORD=xxx psql ...`,或設定 `~/.pgpass` 檔 (格式 `host:port:db:user:password`,權限須為 `chmod 600`)。
+
 ## 1.9 常見問題
 
 | 問題 | 解法 |
