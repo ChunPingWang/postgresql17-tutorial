@@ -142,6 +142,38 @@ ALTER ROLE rexwang SET search_path TO shop, public;
 ALTER DATABASE bookstore SET search_path TO shop, public;
 ```
 
+### 查詢已設定的 search_path
+
+DATABASE / ROLE 層級的持久設定存在系統表 **`pg_db_role_setting`**:
+
+```sql
+SELECT COALESCE(d.datname, '(所有資料庫)') AS database,
+       COALESCE(r.rolname, '(所有角色)')   AS role,
+       s.setconfig
+FROM pg_db_role_setting s
+LEFT JOIN pg_database d ON d.oid = s.setdatabase
+LEFT JOIN pg_roles    r ON r.oid = s.setrole;
+-- setconfig 會顯示如 {search_path=shop, public}
+```
+
+psql 裡一行看完:`\drds`
+
+想知道「當前生效的值是從哪一層來的」:
+
+```sql
+SELECT name, setting, source
+FROM pg_settings
+WHERE name = 'search_path';
+-- source: default / database / user / session
+```
+
+排查「為什麼我的表建到別的 schema」時最好用。還原設定:
+
+```sql
+ALTER DATABASE bookstore RESET search_path;
+ALTER ROLE rexwang RESET search_path;
+```
+
 ### `$user` 是什麼?
 
 `$user` 是個變數,等於當前使用者名稱。預設 `search_path = "$user", public` 意思是:
