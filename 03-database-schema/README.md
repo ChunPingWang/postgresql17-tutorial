@@ -250,6 +250,24 @@ FROM pg_database
 ORDER BY pg_database_size(datname) DESC;
 ```
 
+### `pg_database_size` 與 `pg_size_pretty`
+
+這兩個函數是搭配使用的:內層算大小、外層做格式化。
+
+**`pg_database_size(name)`** 回傳資料庫的實際磁碟占用 (`bigint`,單位 bytes)。計算範圍是該資料庫的**全部**空間——資料表、索引、TOAST 等,是檔案系統上的真實占用,不是估計值。需要對目標資料庫的 `CONNECT` 權限。
+
+同家族的常用函數:
+
+| 函數 | 量什麼 |
+|------|--------|
+| `pg_table_size('shop.books')` | 單一表 (含 TOAST,不含索引) |
+| `pg_indexes_size('shop.books')` | 該表所有索引 |
+| `pg_total_relation_size('shop.books')` | 表 + 索引 + TOAST,最常用 |
+
+**`pg_size_pretty(bigint)`** 把 bytes 換算成人類可讀的文字,如 `8529 kB`、`156 MB` (1024 進位)。純粹是顯示美化,不改變數值。
+
+> ⚠️ 注意範例中 `ORDER BY pg_database_size(datname)` 是**重算原始數字**,而不是 `ORDER BY size`——`size` 已被轉成**文字**,按它排序會變成字串比較 (`"8 kB"` 排在 `"7 MB"` 後面),結果完全錯誤。慣例:顯示用 pretty 版本,排序用原始 bigint。
+
 ## 章節腳本
 
 - [`scripts/01-create-and-explore.sql`](./scripts/01-create-and-explore.sql) — 建立/瀏覽資料庫與 schema
