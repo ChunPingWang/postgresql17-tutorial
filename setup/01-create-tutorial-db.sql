@@ -3,8 +3,13 @@
 -- 用法:psql -d postgres -f setup/01-create-tutorial-db.sql
 -- =====================================================================
 
+-- 遇錯即停,避免錯誤後續連鎖執行在錯的資料庫上
+\set ON_ERROR_STOP on
+
 -- 若已存在則砍掉重建,確保乾淨環境 (謹慎使用!)
-DROP DATABASE IF EXISTS bookstore;
+-- WITH (FORCE):強制斷開既有連線 (如 pgAdmin) 再刪除,否則
+-- 有人連著 bookstore 時會報 "is being accessed by other users"
+DROP DATABASE IF EXISTS bookstore WITH (FORCE);
 
 CREATE DATABASE bookstore
     WITH ENCODING = 'UTF8'
