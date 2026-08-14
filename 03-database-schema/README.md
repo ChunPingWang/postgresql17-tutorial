@@ -320,6 +320,7 @@ ORDER BY pg_database_size(datname) DESC;
 
 - [`scripts/01-create-and-explore.sql`](./scripts/01-create-and-explore.sql) — 建立/瀏覽資料庫與 schema
 - [`scripts/02-search-path-demo.sql`](./scripts/02-search-path-demo.sql) — search_path 行為示範
+- [`scripts/03-search-path-query.sql`](./scripts/03-search-path-query.sql) — 查詢各層級 search_path 設定
 
 ---
 
