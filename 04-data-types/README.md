@@ -47,6 +47,8 @@ CREATE TABLE products (
 INSERT INTO products VALUES (1, 9.99), (2, 1234567.89);
 ```
 
+> 💡 **沒指定 schema,表會建在哪?** 建在 `search_path` 中**第一個實際存在的 schema**(見第 3 章 3.6 節)。預設 `"$user", public` 下,與使用者同名的 schema 通常不存在而被跳過,所以本章的練習表都落在 **`public`**——與教程主要資料所在的 `shop` schema 互不干擾。可用 `SELECT current_schema();` 事先確認落點。注意:若你執行過第 3 章的 `ALTER ROLE ... SET search_path TO shop, public;` 範例,新 session 的落點會變成 `shop`,可用 `SHOW search_path;` 檢查、`ALTER ROLE rexwang RESET search_path;` 還原。
+
 ## 4.3 序號:SERIAL vs IDENTITY
 
 過去常用 `SERIAL`,實際是 `INTEGER + sequence` 的糖衣。**SQL 標準推薦 `IDENTITY`**:
