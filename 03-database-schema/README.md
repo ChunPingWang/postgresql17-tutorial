@@ -156,6 +156,8 @@ LEFT JOIN pg_roles    r ON r.oid = s.setrole;
 -- setconfig 會顯示如 {search_path=shop, public}
 ```
 
+> 💡 **查詢結果為空是正常的**:這張表只存 `ALTER DATABASE/ROLE ... SET` 寫入的持久設定,沒設定過就是空的。想看到資料,先執行 `ALTER DATABASE bookstore SET search_path TO shop, public;` 再查一次(看完記得 `RESET` 還原)。可與下方 `pg_settings` 查詢交叉驗證:表為空時 `source` 應顯示 `default` 或 `session`,而不會是 `database` / `user`。另外,示範腳本 `03-search-path-query.sql` 結尾會 RESET 清理,跑完後此表同樣是空的——刻意設計,不留副作用。
+
 psql 裡一行看完:`\drds`
 
 想知道「當前生效的值是從哪一層來的」:
