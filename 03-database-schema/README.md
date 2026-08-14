@@ -89,6 +89,15 @@ psql -h localhost -p 5432 -U rexwang -d bookstore
 
 Schema 是 PostgreSQL 與某些初學者熟悉的 MySQL 最大不同處之一。**MySQL 的 "database" 約等於 PostgreSQL 的 "schema"**。
 
+### 四大使用場景
+
+| 場景 | 做法 | 好處 |
+|------|------|------|
+| **模組化命名空間** (最常見) | 依業務領域分組:`shop`、`audit`、`reporting` (本教程 bookstore 用的就是 `shop`) | 同名不衝突 (`app.users` 與 `audit.users` 並存,見 3.7 練習);schema 之間 JOIN 就是普通 JOIN——若拆成多個 database 就得靠 FDW,這是 schema 的關鍵優勢 |
+| **權限邊界** | `GRANT USAGE ON SCHEMA reporting TO analyst;` 整個 schema 一次授權 | 分析師只看得到 `reporting`,碰不到 `shop` 原始表;PG 15 收緊 `public` 就是推這個模式 |
+| **多租戶 (multi-tenancy)** | 每個客戶一個 schema (`tenant_a.orders`、`tenant_b.orders`),連線後 `SET search_path TO tenant_a` | 表結構相同、資料隔離,同一套 SQL 服務不同租戶——search_path 短名解析最典型的生產應用 |
+| **版本 / 環境隔離** | migration 時建 `v2` schema 平行準備新結構 | 切換只改 search_path 或 rename schema,失敗可秒回滾 |
+
 ### 建立 / 刪除 schema
 
 ```sql
@@ -188,13 +197,30 @@ ALTER ROLE rexwang RESET search_path;
 - **建錯位置的表不會搬回去**:search_path 是 `shop, public` 期間建的表已實體落在 `shop`,要搬得用 `ALTER TABLE shop.t1 SET SCHEMA public;`
 - **當前 session 不會立即變**:DATABASE/ROLE 層設定只在**連線建立時**讀取,RESET 後同一 session 的 `SHOW search_path` 不變,要重連才看得到效果 (與 `ALTER ... SET` 的生效時機是同一規則)
 
-### `$user` 是什麼?
+### `$user` 是什麼?場景與目的
 
-`$user` 是個變數,等於當前使用者名稱。預設 `search_path = "$user", public` 意思是:
+`$user` 是個變數,解析時展開成當前使用者名稱。預設 `search_path = "$user", public` 意思是:
 - 先找與使用者同名的 schema (如 `rexwang`)
 - 找不到再找 `public`
 
-這在多使用者隔離時很方便。
+這是為了支援 SQL 標準的老模式:**每個使用者一個私有工作區** (per-user schema)。DBA 只要做一件事:
+
+```sql
+CREATE SCHEMA alice AUTHORIZATION alice;
+CREATE SCHEMA bob   AUTHORIZATION bob;
+```
+
+之後 alice 連進來,`CREATE TABLE experiment (...)` 自動落在 `alice` schema,她的短名查詢也解析到自己的表——**零設定、零前綴,每人一個互不干擾的沙盒**,bob 建同名表完全不衝突。目的有三層:
+
+1. **隔離**:多人共用資料庫時,各自的實驗物件不互相污染、不弄髒 `public`
+2. **免設定**:不需要每人各自 `SET search_path`,預設值天生指向自己的 schema
+3. **共享仍可行**:路徑第二順位是 `public`——私有的優先、共享的兜底
+
+典型場景:教學環境 (一班學生共用一個 DB)、分析團隊的 scratch 區、多人直連的開發資料庫。
+
+**為什麼多數人無感**:同名 schema 預設不存在,`$user` 展開後找不到就被靜默跳過,實際落到 `public`。這個模式是**選擇加入**的——DBA 建了同名 schema 就自動生效。反過來也有個反直覺行為:哪天有人替你建了同名 schema,你的新表落點會**默默改變**,可用 `SELECT current_schema();` 隨時確認。
+
+**現代實務定位**:應用程式後端通常不用此模式 (app 用固定服務帳號連線,傾向 `shop`、`audit` 這類業務 schema);`$user` 模式主要活在「多個真人直連資料庫」的場景。本教程 bookstore 用 `shop`,走的就是應用程式路線。
 
 ### search_path 影響哪些功能?
 
