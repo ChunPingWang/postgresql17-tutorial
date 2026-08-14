@@ -53,6 +53,8 @@ CREATE DATABASE myapp
 
 > 💡 一旦建立,**`LC_COLLATE` 與 `LC_CTYPE` 不可修改**,要改只能重建資料庫。
 
+> ⚠️ **`CREATE DATABASE` 不能在交易內執行** (錯誤 25001:`cannot run inside a transaction block`)。在 pgAdmin Query Tool 中,若按 F5 一次執行**多條語句**,pgAdmin 會把整段包成隱式交易而觸發此錯誤——請**只選取 `CREATE DATABASE` 那一行**單獨執行,並確認執行鈕旁的 **Auto commit** 是開啟的。psql 則是逐條送出語句,整段腳本照貼即可。
+
 ## 3.3 列出與刪除資料庫
 
 ```sql
@@ -148,7 +150,58 @@ ALTER DATABASE bookstore SET search_path TO shop, public;
 
 這在多使用者隔離時很方便。
 
+### 隱含的 schema:`pg_temp` 與 `pg_catalog`
+
+`SHOW search_path` 顯示的不是全貌。實際生效的搜尋順序前面還隱含了兩個 schema:
+
+1. `pg_temp` — 當前 session 的暫時表 schema,**排在最前面**。同名暫時表會優先於一般表被找到
+2. `pg_catalog` — 系統物件 (`pg_class`、`now()`、`lower()`...),所以系統表和內建函數不用前綴就找得到
+
+```sql
+-- 列出「實際生效」的完整搜尋清單 (true = 包含隱含 schema)
+SELECT current_schemas(true);
+--        current_schemas
+-- -----------------------------
+--  {pg_catalog,shop,public}
+```
+
+### `SET LOCAL`:只在交易內生效
+
+`SET search_path` 的效果持續到 session 結束;改用 `SET LOCAL` 則只在**當前交易**內有效,交易結束 (COMMIT 或 ROLLBACK) 自動還原。適合在 migration 腳本中臨時切換,不怕忘記改回來:
+
+```sql
+BEGIN;
+SET LOCAL search_path TO audit, public;
+-- ... 這裡的短名都解析到 audit schema ...
+COMMIT;
+-- search_path 已自動恢復原值
+```
+
+### 安全性:`SECURITY DEFINER` 函數要固定 search_path
+
+`SECURITY DEFINER` 函數以**定義者**的權限執行。若它依賴呼叫者的 search_path 解析短名,攻擊者可以在會被優先搜到的 schema 裡建同名表或函數,劫持執行流程。慣例是在函數上直接固定:
+
+```sql
+CREATE FUNCTION transfer_funds(...) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp   -- 固定,不受呼叫者影響
+AS $$ ... $$;
+```
+
+一般程式碼若跑在權限敏感的環境,也建議一律寫 `schema.object` 全名,完全不經過 search_path。PG 15 起 `public` 不再開放所有人寫入 (見 3.5 節),正是為了收緊這類風險。
+
+### 權限是另一回事
+
+schema 出現在 search_path 裡不代表有權使用:對某 schema 沒有 `USAGE` 權限時,它會被**靜默跳過**,不會報錯。查不到表時除了檢查 search_path,也要確認權限:
+
+```sql
+SELECT has_schema_privilege('shop', 'USAGE');
+```
+
 ## 3.7 實作練習
+
+> 💡 本練習以 **psql** 為前提:`\c` 是 psql 專屬指令,**在 pgAdmin Query Tool 中無法使用**。若用 pgAdmin,請先單獨執行 `CREATE DATABASE practice;`(見 3.2 的注意事項),再到 Object Explorer 右鍵 **Databases → Refresh**,對 `practice` 右鍵開新的 **Query Tool** 執行後續語句。
 
 ```sql
 -- 1) 建立一個練習資料庫
