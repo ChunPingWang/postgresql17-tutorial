@@ -178,6 +178,16 @@ ALTER DATABASE bookstore RESET search_path;
 ALTER ROLE rexwang RESET search_path;
 ```
 
+### RESET 之後會發生什麼?
+
+`RESET` 只是**把 `pg_db_role_setting` 裡那筆持久設定刪掉**,讓下一個層級的預設值浮上來。取值優先序:session 的 `SET` > `ALTER ROLE IN DATABASE` > `ALTER ROLE` > `ALTER DATABASE` > `postgresql.conf` > 內建預設 `"$user", public`。兩層都 RESET 後,新 session 就回到 `"$user", public`——短名 `books` 查不到了,要寫 `shop.books`;新表也改建在 `public`。
+
+三個常見誤解:
+
+- **schema 和資料原封不動**:RESET 只改名稱解析的預設路徑,`shop.books` 還在,寫全名照常運作
+- **建錯位置的表不會搬回去**:search_path 是 `shop, public` 期間建的表已實體落在 `shop`,要搬得用 `ALTER TABLE shop.t1 SET SCHEMA public;`
+- **當前 session 不會立即變**:DATABASE/ROLE 層設定只在**連線建立時**讀取,RESET 後同一 session 的 `SHOW search_path` 不變,要重連才看得到效果 (與 `ALTER ... SET` 的生效時機是同一規則)
+
 ### `$user` 是什麼?
 
 `$user` 是個變數,等於當前使用者名稱。預設 `search_path = "$user", public` 意思是:
