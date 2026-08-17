@@ -44,6 +44,10 @@ ORDER BY r.revenue DESC;
 ### CTE 可以寫入 (INSERT/UPDATE/DELETE)
 
 ```sql
+-- 先準備封存表 (同第 6 章 6.1 的做法)
+CREATE SCHEMA IF NOT EXISTS archive;
+CREATE TABLE IF NOT EXISTS archive.books_old (LIKE shop.books INCLUDING ALL);
+
 WITH deleted AS (
     DELETE FROM shop.books
     WHERE stock = 0 AND published_at < '2000-01-01'
@@ -51,6 +55,7 @@ WITH deleted AS (
 )
 INSERT INTO archive.books_old
 SELECT * FROM deleted;
+-- 練習完可清理:DROP SCHEMA archive CASCADE;
 ```
 
 ## 14.2 遞迴 CTE — `WITH RECURSIVE`

@@ -17,9 +17,13 @@ INSERT INTO shop.categories (name, description) VALUES
     ('Music', '音樂'),
     ('Sport', '體育');
 
--- 從另一張表
+-- 從另一張表 (目標表必須已存在,這裡先建一張示範用的封存表)
+CREATE SCHEMA IF NOT EXISTS archive;
+CREATE TABLE IF NOT EXISTS archive.books_old (LIKE shop.books INCLUDING ALL);
+
 INSERT INTO archive.books_old
 SELECT * FROM shop.books WHERE published_at < '2000-01-01';
+-- 練習完可清理:DROP SCHEMA archive CASCADE;
 
 -- 用 DEFAULT
 INSERT INTO shop.customers (name, email, registered_at)
