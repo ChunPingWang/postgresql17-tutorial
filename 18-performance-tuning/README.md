@@ -316,6 +316,45 @@ fio --name=randrw --bs=8k --rw=randrw --iodepth=32 \
 
 `random_page_cost` 在 SAN/雲碟上通常設 1.1~1.5,不要沿用 HDD 時代的預設 4。
 
+**NUMA (多插槽伺服器)**:每顆 CPU 有自己的「本地」記憶體,跨插槽存取延遲約高 1.5~2 倍。PostgreSQL 的 `shared_buffers` 是一大塊共享記憶體,預設會集中配置在啟動時所在的 NUMA node — 其他 node 的 backend 存取它全是遠端存取。多路伺服器上這是最常被忽略的效能陷阱:
+
+```bash
+# /etc/sysctl.d/99-postgresql.conf
+
+# 一定要關 zone_reclaim:開著時核心寧可回收本地 page cache 也不用遠端記憶體,
+# 資料庫的 cache 會一直被丟掉
+vm.zone_reclaim_mode = 0
+
+# 關自動 NUMA balancing:核心搬移頁面「優化」局部性,
+# 對共享記憶體型工作負載反而造成延遲尖峰
+kernel.numa_balancing = 0
+```
+
+```bash
+# 啟動時把 shared_buffers 平均分散到各 node
+numactl --interleave=all pg_ctl start -D $PGDATA
+
+# 檢查:node 數量、numa_miss 是否持續增長
+numactl --hardware
+numastat
+```
+
+單插槽機器、一般大小的雲端 VM 沒這問題;大型 VM (vCPU 超過一個實體插槽) 會暴露 vNUMA,同樣適用。
+
+**CPU**:
+
+- **單核時脈 vs 核心數**:一個查詢 (不含平行查詢) 只跑在一個 backend process 上 — OLTP 的查詢延遲取決於**單核效能**,核心數決定並發能力與平行查詢上限。選硬體/雲端機型:OLTP 偏好高時脈,分析型偏好多核。
+- **governor 與省電機制**:預設的 `powersave`/`schedutil` 低載時降頻、進深度 C-state,喚醒要時間 — 表現為「壓力小反而延遲抖動」:
+
+```bash
+cpupower frequency-set -g performance     # 鎖 performance governor
+cpupower idle-set -D 10                   # 限制深度 C-state (延遲敏感時)
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # 確認
+```
+
+- **context switch**:活躍連線數遠超過核心數時,行程切換開銷吃掉吞吐 — 這正是 18.7 節 PgBouncer 把 `default_pool_size` 設在核心數 2~4 倍的理由。
+- **平行查詢對應**:`max_parallel_workers_per_gather`、`max_worker_processes` 跟實際核心數 (容器裡是 CPU 配額) 相符。
+
 **最大檔案開啟數**:PostgreSQL 每個表、索引都是獨立檔案 (超過 1GB 再切段),每個 backend process 各自開啟用到的檔案,描述符消耗 = 連線數 × 各自觸碰的物件數,很容易上萬:
 
 - PostgreSQL 內部有「虛擬檔案描述符」(VFD) 機制,達到上限會自己關舊檔開新檔,通常**不會崩潰**,但頻繁 open/close 是白白的 syscall 開銷 — 大量分區表 + 高連線數時會明顯拖慢查詢。
@@ -371,6 +410,8 @@ df -h /dev/shm                                     # 容器內確認 shm 大小
 mount | grep -E "postgres|pgdata"                  # 檔案系統類型與 noatime
 ulimit -n                                          # 開檔數上限 (建議 ≥ 65536)
 pg_test_fsync -s 5                                 # fsync 延遲實測 (本地 NVMe 應 < 0.1ms)
+numastat | head -3                                 # 多路機器看 numa_miss 是否持續增長
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor  # 應為 performance
 ```
 
 ## 章節腳本
