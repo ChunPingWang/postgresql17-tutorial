@@ -255,9 +255,80 @@ echo none | sudo tee /sys/block/nvme0n1/queue/scheduler
 # 掛載 PGDATA 的檔案系統加 noatime,省掉每次讀取都更新 atime 的寫入
 # /etc/fstab
 /dev/nvme0n1p1  /var/lib/postgresql  ext4  noatime  0 2
+
+# Seq Scan 依賴 OS 預讀,確認 read-ahead (單位 512B 磁區,4096 = 2MB)
+blockdev --getra /dev/nvme0n1
+sudo blockdev --setra 4096 /dev/nvme0n1
 ```
 
 搭配第 18.5 節:SSD 環境記得 `random_page_cost = 1.1`、`effective_io_concurrency = 200`。
+
+**檔案系統怎麼選**:PostgreSQL 把資料存成一般檔案,檔案系統的行為直接反映在 I/O 效能上。
+
+| 檔案系統 | 適用性 | 說明 |
+|----------|--------|------|
+| ext4 | ✅ 主流首選 | 穩定、生產驗證充分 |
+| XFS | ✅ 主流首選 | 大表、高並行寫入通常略優 (allocation group 平行度佳) |
+| ZFS / Btrfs | ⚠️ 有代價 | Copy-on-Write:隨機寫有額外開銷、易碎片化;換來壓縮與快照 |
+| NFS | ❌ 小心 | fsync 語意不完整時可能損壞資料,非必要不用 |
+
+用 ZFS 時把 `recordsize` 設為 8K~16K 對齊 PostgreSQL 頁面 — 否則一次 8KB 寫入會觸發預設 128KB record 的讀-改-寫。
+
+**Block 大小與對齊**:這裡有三層 block,對齊與否很重要:
+
+```
+PostgreSQL 頁面 8KB (編譯期固定)
+  → 檔案系統 block 4KB
+    → 磁碟實體磁區 512B 或 4KB
+```
+
+- 因為檔案系統 block (4KB) 小於 PostgreSQL 頁面 (8KB),一次頁面寫入**不是原子的** — 斷電可能只寫一半 (torn page)。這正是 `full_page_writes = on` 存在的原因:checkpoint 後每頁第一次修改要把整頁寫進 WAL,是不小的寫入放大。
+- 若底層能保證 8KB 原子寫入 (如 ZFS 的 CoW 特性),`full_page_writes = off` 可顯著減少 WAL 量 — 但**關錯環境就是資料損壞**,不確定就別關。
+- 分割區對齊不良 (舊工具建的分割區) 會讓每個 I/O 橫跨兩個實體磁區,吞吐直接打折,`fdisk -l` 檢查起始磁區是否為 2048 的倍數。
+
+**儲存層 (本地碟 / SAN / 雲碟)**:儲存通常是資料庫最大的瓶頸 — COMMIT 路徑是同步的,WAL 沒 fsync 完成交易就不能返回,儲存延遲直接乘在 TPS 上。三個指標按重要性:
+
+1. **fsync/寫入延遲** — 決定交易延遲。本地 NVMe 約 0.02~0.1ms,SAN/雲碟走網路後常見 0.5~2ms
+2. **隨機讀 IOPS** — OLTP 的 Index Scan 都是 8KB 隨機讀,cache 未命中時全靠它
+3. **循序吞吐** — 影響 Seq Scan、VACUUM、備份還原速度
+
+| 儲存類型 | 延遲 | 說明 |
+|----------|------|------|
+| 本地 NVMe | 最低 | 現代部署首選,HA 交給 streaming replication |
+| FC/iSCSI SAN | 中 | 傳統企業主流:集中管理、陣列快照、共享儲存 failover;但多系統共享會互搶 (noisy neighbor) |
+| 雲端區塊儲存 (EBS 等) | 中 | 行為接近 SAN;IOPS 是買來的配額,注意 burst 用完降速 |
+| NAS/NFS | — | 見上表,非必要不用 |
+
+> ⚠️ **write-back cache 必須有電池/電容保護 (BBU)**:SAN 陣列或 RAID 卡的寫入快取若無斷電保護,等於對 fsync「說謊」— 跑分很快,斷電就是資料損壞。看到「fsync 特別快」先確認是 cache 有保護,不是沒真正落盤。
+
+實務建議:
+
+```bash
+# WAL 放獨立 volume:循序的 WAL 寫入與隨機的資料讀寫分開 (SAN/雲碟尤其有感)
+initdb --waldir=/mnt/wal-volume/pg_wal -D $PGDATA
+# 既有叢集:停機後把 pg_wal 搬走再 symlink 回來
+
+# 上線前實測,不要只看規格書
+pg_test_fsync                          # PostgreSQL 附的 fsync 延遲測試
+fio --name=randrw --bs=8k --rw=randrw --iodepth=32 \
+    --size=4G --runtime=60 --filename=/var/lib/postgresql/fio.test
+```
+
+`random_page_cost` 在 SAN/雲碟上通常設 1.1~1.5,不要沿用 HDD 時代的預設 4。
+
+**最大檔案開啟數**:PostgreSQL 每個表、索引都是獨立檔案 (超過 1GB 再切段),每個 backend process 各自開啟用到的檔案,描述符消耗 = 連線數 × 各自觸碰的物件數,很容易上萬:
+
+- PostgreSQL 內部有「虛擬檔案描述符」(VFD) 機制,達到上限會自己關舊檔開新檔,通常**不會崩潰**,但頻繁 open/close 是白白的 syscall 開銷 — 大量分區表 + 高連線數時會明顯拖慢查詢。
+- 相關設定三層:OS 每 process 的 `ulimit -n`、全系統的 `fs.file-max`、PostgreSQL 的 `max_files_per_process` (預設 1000,實際取它與 ulimit 的較小者)。
+
+```bash
+# systemd 環境:/etc/systemd/system/postgresql.service.d/limits.conf
+[Service]
+LimitNOFILE=65536
+
+# 容器環境
+docker run --ulimit nofile=65536:65536 ...
+```
 
 ### 虛擬機額外注意事項
 
@@ -297,6 +368,9 @@ cat /sys/kernel/mm/transparent_hugepage/enabled   # THP 應為 never
 grep Huge /proc/meminfo                            # huge pages 保留與使用量
 vmstat 1 5                                         # si/so 應為 0,VM 注意 st 欄位
 df -h /dev/shm                                     # 容器內確認 shm 大小
+mount | grep -E "postgres|pgdata"                  # 檔案系統類型與 noatime
+ulimit -n                                          # 開檔數上限 (建議 ≥ 65536)
+pg_test_fsync -s 5                                 # fsync 延遲實測 (本地 NVMe 應 < 0.1ms)
 ```
 
 ## 章節腳本
