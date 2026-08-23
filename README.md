@@ -79,7 +79,7 @@ psql -d bookstore
 | [15](./15-json-fulltext/) | JSON / 全文搜尋 | JSONB 操作子、運算符、`tsvector` / `tsquery` |
 | [16](./16-roles-permissions/) | 角色與權限 | `CREATE ROLE` / `GRANT` / `REVOKE` / Row Level Security |
 | [17](./17-backup-restore/) | 備份與還原 | `pg_dump` / `pg_dumpall` / `pg_restore` / PITR 概念 |
-| [18](./18-performance-tuning/) | 效能調校 | `EXPLAIN` / `ANALYZE` / `VACUUM` / 統計資料 / 慢查詢 |
+| [18](./18-performance-tuning/) | 效能調校 | `EXPLAIN` / `ANALYZE` / `VACUUM` / 統計資料 / 慢查詢 / OS 與容器調校 |
 
 ---
 

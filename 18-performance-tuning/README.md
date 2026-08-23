@@ -1,6 +1,6 @@
 # 第 18 章 效能調校
 
-> 目標:能用 EXPLAIN ANALYZE 讀執行計畫、設定 postgresql.conf 關鍵參數、用 VACUUM 維護資料庫健康。
+> 目標:能用 EXPLAIN ANALYZE 讀執行計畫、設定 postgresql.conf 關鍵參數、用 VACUUM 維護資料庫健康,並了解 OS 與容器層級的調校重點。
 >
 > 🧰 **前置準備**:本章範例使用 `bookstore` 資料庫 (`shop` schema 與範例資料)。尚未建立的話,先在 repo 根目錄執行 `psql -d postgres -f setup/01-create-tutorial-db.sql` 與 `psql -d bookstore -f setup/02-sample-data.sql`,詳見[第 1 章 1.8 節](../01-installation/README.md#18-建立教學用資料庫)。
 
@@ -201,6 +201,102 @@ SELECT
 FROM pg_stat_user_tables
 WHERE schemaname = 'shop'
 ORDER BY pg_total_relation_size(relid) DESC;
+```
+
+## 18.10 作業系統與容器層級調校
+
+資料庫調校不只在 `postgresql.conf` — PostgreSQL 大量依賴 OS 的記憶體管理與磁碟 I/O,底層環境沒調好,上層參數調再多也有限。本節依「實體機/虛擬機 (Linux)」與「容器 (Docker)」分別說明。
+
+### Linux 核心參數 (實體機/虛擬機通用)
+
+```bash
+# /etc/sysctl.d/99-postgresql.conf,改完執行 sudo sysctl --system 生效
+
+# 降低 swap 傾向:資料庫的記憶體被 swap 出去是效能災難
+vm.swappiness = 1
+
+# 記憶體 overcommit 策略設為 2 (不過度承諾),避免 OOM killer 殺掉 postgres
+vm.overcommit_memory = 2
+vm.overcommit_ratio = 90
+
+# 控制 dirty page 寫回:預設值太大,會累積大量 dirty page 後一次猛寫,
+# 造成 checkpoint 時 I/O 尖峰。改用絕對值 (bytes) 讓寫回更平滑
+vm.dirty_background_bytes = 67108864   # 64MB 開始背景寫回
+vm.dirty_bytes = 536870912             # 512MB 強制同步寫回
+```
+
+**Huge Pages**:`shared_buffers` 較大 (數 GB) 時,用 huge pages 可減少頁表開銷與 TLB miss:
+
+```bash
+# 1. 先問 PostgreSQL 需要幾個 huge page (PG 15+ 提供)
+postgres -D $PGDATA -C shared_memory_size_in_huge_pages
+
+# 2. 設定核心保留 (數字用上面查到的值)
+sudo sysctl -w vm.nr_hugepages=600     # 也寫進 /etc/sysctl.d/ 持久化
+
+# 3. postgresql.conf 明確要求 (拿不到 huge page 就啟動失敗,避免默默退化)
+huge_pages = on
+```
+
+注意:要用的是「標準 huge pages」,**Transparent Huge Pages (THP) 反而要關掉** — THP 的背景整理 (khugepaged) 會造成不可預期的延遲尖峰:
+
+```bash
+echo never | sudo tee /sys/kernel/mm/transparent_hugepage/enabled
+# 持久化:寫進 systemd unit 或開機腳本;多數發行版預設是 madvise/always
+```
+
+**磁碟與檔案系統**:
+
+```bash
+# SSD/NVMe 用 none (或 mq-deadline),避免多餘的 I/O 排程開銷
+cat /sys/block/nvme0n1/queue/scheduler
+echo none | sudo tee /sys/block/nvme0n1/queue/scheduler
+
+# 掛載 PGDATA 的檔案系統加 noatime,省掉每次讀取都更新 atime 的寫入
+# /etc/fstab
+/dev/nvme0n1p1  /var/lib/postgresql  ext4  noatime  0 2
+```
+
+搭配第 18.5 節:SSD 環境記得 `random_page_cost = 1.1`、`effective_io_concurrency = 200`。
+
+### 虛擬機額外注意事項
+
+| 項目 | 建議 |
+|------|------|
+| Memory ballooning | 對 DB VM 停用或設保留記憶體 — balloon 搶走記憶體等同於 swap 災難 |
+| CPU steal time | `vmstat` 的 `st` 欄位持續 > 5% 表示宿主機超賣,查詢延遲會抖動 |
+| 磁碟快取模式 | 虛擬磁碟避免 writeback 快取 (可能違反 fsync 持久性);cache=none 較安全 |
+| 時鐘源 | `kvm-clock`/`tsc` 即可;時鐘不穩會影響 `EXPLAIN ANALYZE` 與日誌時間 |
+
+### 容器 (Docker) 注意事項
+
+```bash
+docker run -d --name pg17 \
+  --shm-size=1g \                      # 見下方說明
+  --memory=4g --memory-swap=4g \      # 記憶體上限,swap 設成相同值 = 禁用 swap
+  --stop-timeout 120 \                 # 給 PostgreSQL 足夠時間乾淨關機
+  -v pgdata:/var/lib/postgresql/data \ # 資料一定要放 volume
+  -e POSTGRES_PASSWORD=... \
+  postgres:17
+```
+
+- **`--shm-size` 是最常見的坑**:Docker 預設 `/dev/shm` 只有 **64MB**,而平行查詢 (parallel query) 會透過它配置動態共享記憶體,太小會出現 `ERROR: could not resize shared memory segment ... No space left on device`。建議至少設 `256MB`,大型工作負載給到 `shared_buffers` 的等級。
+- **cgroup 記憶體上限與 OOM**:`shared_buffers` + 各連線的 `work_mem` 加總若逼近 `--memory` 上限,容器內的 postgres 會被 OOM kill (日誌只看到 exit code 137)。上限抓 `shared_buffers` 的 3~4 倍以上較安全。
+- **`effective_cache_size` 要照 cgroup 限制設**:PostgreSQL 偵測到的是宿主機總記憶體,不是容器上限;在 `--memory=4g` 的容器裡應手動設 `effective_cache_size = 3GB` 左右,而不是讓它以為有整台機器的 cache。
+- **資料放 named volume 或 bind mount**,不要放在容器的 overlayfs 可寫層 — 除了容器刪除即遺失,copy-on-write 也拖慢 I/O。
+- **CPU 限制影響平行查詢**:`--cpus=2` 時,把 `max_parallel_workers_per_gather`、`max_worker_processes` 調到與配額相符,避免 worker 之間互搶時間片。
+- **宿主機核心參數仍然有效**:容器共用宿主機核心,上面的 `vm.swappiness`、THP、I/O scheduler 都要在**宿主機**上調,容器內改不了。
+
+> Kubernetes 環境同理:`resources.limits.memory` 對應上述 cgroup 議題、`emptyDir{medium: Memory}` 掛載 `/dev/shm`、資料用 PVC。生產環境建議直接用 CloudNativePG 等 operator,這些細節多半已處理好。
+
+### 快速檢查清單
+
+```bash
+free -h && cat /proc/sys/vm/swappiness            # swap 用量與傾向
+cat /sys/kernel/mm/transparent_hugepage/enabled   # THP 應為 never
+grep Huge /proc/meminfo                            # huge pages 保留與使用量
+vmstat 1 5                                         # si/so 應為 0,VM 注意 st 欄位
+df -h /dev/shm                                     # 容器內確認 shm 大小
 ```
 
 ## 章節腳本
