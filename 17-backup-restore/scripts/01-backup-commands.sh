@@ -5,7 +5,9 @@
 set -euo pipefail
 export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
 
-BACKUP_DIR="${HOME}/workspace/postgresql-tutorial/17-backup-restore/backup_files"
+# 以腳本所在位置推算,不依賴 repo 放在哪個目錄
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKUP_DIR="${SCRIPT_DIR}/../backup_files"
 mkdir -p "$BACKUP_DIR"
 
 echo "── 1. Custom 格式備份 ──────────────────────"

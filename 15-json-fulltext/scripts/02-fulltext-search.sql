@@ -49,7 +49,7 @@ SELECT
     title,
     ts_headline('english', title,
                 websearch_to_tsquery('english', 'art programming'),
-                'StartSel=[, StopSel=], MaxWords=5') AS headline
+                'StartSel=[, StopSel=], MinWords=3, MaxWords=8') AS headline
 FROM books
 WHERE tsv @@ websearch_to_tsquery('english', 'art programming');
 

@@ -43,7 +43,7 @@ LANGUAGE plpgsql STABLE
 AS $$
 BEGIN
     RETURN QUERY
-    SELECT b.id, b.title, b.price
+    SELECT b.id, b.title::TEXT, b.price
     FROM shop.books b
     JOIN shop.categories c ON c.id = b.category_id
     WHERE c.name = c_name

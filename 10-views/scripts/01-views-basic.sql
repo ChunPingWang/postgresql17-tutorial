@@ -68,7 +68,7 @@ BEGIN
         INSERT INTO v_pending_orders (customer_id, status, total)
         VALUES (1, 'completed', 100);
         RAISE EXCEPTION '應該被 CHECK OPTION 攔下';
-    EXCEPTION WHEN check_violation THEN
+    EXCEPTION WHEN with_check_option_violation THEN
         RAISE NOTICE '✅ WITH CHECK OPTION 攔下不符合條件的 INSERT';
     END;
 END$$;
